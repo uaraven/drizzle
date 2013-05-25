@@ -40,14 +40,19 @@ class WeatherIndicator:
         self.menu = gtk.Menu()
 
         if len(self.weather) != 0:
-            self.menu.append(self.create_menu_item(self.location_name))
+            self.menu.append(self.create_menu_item(self.title))
             self.menu.append(self.create_menu_item(None))
             self.menu.append(self.create_menu_item(self.weather[NOW]['text']))
             self.menu.append(self.create_menu_item(
                 "Temperature: " + self.weather[NOW]['temp'] + ' ' + self.temperature_unit))  # TODO: Localize
-            self.menu.append(self.create_menu_item())
+            self.menu.append(self.create_menu_item('Humidity: ' + self.weather[NOW]['humidity'] + '%'))
+            self.menu.append(self.create_menu_item('Pressure: ' + self.weather[NOW]['pressure'] + ' '
+                                                   + self.pressure_unit))
+            if len(self.weather[NOW]['visibility']) > 0:
+                self.menu.append(self.create_menu_item('Visibility: ' + self.weather[NOW]['visibility'] + ' '
+                                                       + self.distance_unit))
             pass
-
+            self.menu.append(self.create_menu_item(None))
         self.quit_item = gtk.MenuItem("Quit") # TODO: Localize
         self.quit_item.connect("activate", self.quit)
         self.quit_item.show()
@@ -76,11 +81,6 @@ class WeatherIndicator:
 
         self.weather = {}
 
-        self.weather['humidity'] = weather[ATMOSPHERE]['humidity']
-        self.weather['pressure'] = weather[ATMOSPHERE]['pressure']
-        self.weather['pressure_rising'] = [False, True][int(weather[ATMOSPHERE]['rising'])]
-        self.weather['visibility'] = weather[ATMOSPHERE]['visibility']
-
         self.weather[NOW] = {'condition_code': weather[CONDITION]['code'], 'temp': weather[CONDITION]['temp'],
                              'text': weather[CONDITION]['text']}
 
@@ -88,11 +88,20 @@ class WeatherIndicator:
         self.weather[NOW]['wind_direction'] = weather['wind']['direction']
         self.weather[NOW]['wind_speed'] = weather['wind']['speed']
 
+        self.weather[NOW]['humidity'] = weather[ATMOSPHERE]['humidity']
+        self.weather[NOW]['pressure'] = weather[ATMOSPHERE]['pressure']
+        self.weather[NOW]['pressure_rising'] = [False, True][int(weather[ATMOSPHERE]['rising'])]
+        self.weather[NOW]['visibility'] = weather[ATMOSPHERE]['visibility']
+
         self.location_name = weather['location']['city'] + ', ' + weather['location']['country']
+        self.title = weather[CONDITION]['title']
 
         self.indicator.set_icon(weather[CONDITION]['code'])
 
         self.temperature_unit = weather['units']['temperature']
+        self.distance_unit = weather['units']['distance']
+        self.pressure_unit = weather['units']['pressure']
+        self.speed_unit = weather['units']['speed']
 
         self.menu_setup()
         gtk.timeout_add(self.update_interval * 60 * 1000, self.update_weather)
