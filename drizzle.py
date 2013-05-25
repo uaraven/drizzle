@@ -1,24 +1,78 @@
+# coding=utf-8
 import sys
 import os
 import gtk
 import appindicator
 import pywapi
+import datetime
+
+
+CONFIG_PATH = '.config/drizzle'
 
 NOW = 'now'
-
 ATMOSPHERE = 'atmosphere'
-
+DEGREE = u'°'
 CONDITION = 'condition'
+
+
+class Config:
+    def __init__(self):
+        self.config = os.path.join(os.path.expanduser('~'), CONFIG_PATH)
+
+    def is_location_present(self):
+        return self.get_locations() is not None
+
+    def get_locations(self):
+        loc_file = os.path.join(self.config, 'location')
+        if os.path.exists(loc_file):
+            with open(loc_file) as inp:
+                location = inp.readlines()
+                return [x.strip() for x in location]
+        else:
+            return None
+
+
+class Forecast:
+    def __init__(self, yahoo_forecast):
+        self.code = yahoo_forecast['code']
+        self.date = datetime.date.strptime(yahoo_forecast['date'], '%d %b %Y')
+        self.day = yahoo_forecast['day']
+        self.high = yahoo_forecast['high']
+        self.low = yahoo_forecast['low']
+
+
+class CurrentWeather:
+    def __init__(self, descriptor):
+        self.condition_code = descriptor[CONDITION]['code']
+        self.temp = descriptor[CONDITION]['temp']
+        self.text = descriptor[CONDITION]['text']
+
+        self.wind_chill = descriptor['wind']['chill']
+        self.wind_direction = descriptor['wind']['direction']
+        self.wind_speed = descriptor['wind']['speed']
+
+        self.humidity = descriptor[ATMOSPHERE]['humidity']
+        self.pressure = descriptor[ATMOSPHERE]['pressure']
+        self.pressure_rising = descriptor[ATMOSPHERE]['rising']
+        self.visibility = descriptor[ATMOSPHERE]['visibility']
+
+        self.location_name = descriptor['location']['city'] + ', ' + descriptor['location']['country']
+        self.title = descriptor[CONDITION]['title']
+
+        self.temperature_unit = descriptor['units']['temperature']
+        self.distance_unit = descriptor['units']['distance']
+        self.pressure_unit = descriptor['units']['pressure']
+        self.speed_unit = descriptor['units']['speed']
 
 
 class WeatherIndicator:
     UNKNOWN_WEATHER = "na"
 
-    def __init__(self):
+    def __init__(self, locations):
 
         self_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "icons")
 
-        self.update_interval = 30
+        self.update_interval = 3
         self.weather = {}
 
         self.indicator = appindicator.Indicator("Weather", self.UNKNOWN_WEATHER, appindicator.CATEGORY_OTHER, )
@@ -28,7 +82,9 @@ class WeatherIndicator:
 
         self.temperature_unit = ''
 
-        gtk.timeout_add(1000, self.update_weather)
+        gtk.timeout_add(self.update_interval * 60 * 1000, self.update_weather)
+        self.locations = locations
+        self.id = locations[0]
 
     def create_menu_item(self, text):
         menu_item = gtk.MenuItem(text)
@@ -40,11 +96,13 @@ class WeatherIndicator:
         self.menu = gtk.Menu()
 
         if len(self.weather) != 0:
-            self.menu.append(self.create_menu_item(self.title))
+            self.menu.append(self.create_menu_item(self.location_name))
             self.menu.append(self.create_menu_item(None))
             self.menu.append(self.create_menu_item(self.weather[NOW]['text']))
             self.menu.append(self.create_menu_item(
-                "Temperature: " + self.weather[NOW]['temp'] + ' ' + self.temperature_unit))  # TODO: Localize
+                "Temperature: " + self.weather[NOW]['temp'] + DEGREE + self.temperature_unit))  # TODO: Localize
+            self.menu.append(self.create_menu_item('Feels like: ' + self.weather[NOW]['wind_chill'] + DEGREE
+                                                   + self.temperature_unit))
             self.menu.append(self.create_menu_item('Humidity: ' + self.weather[NOW]['humidity'] + '%'))
             self.menu.append(self.create_menu_item('Pressure: ' + self.weather[NOW]['pressure'] + ' '
                                                    + self.pressure_unit))
@@ -78,11 +136,10 @@ class WeatherIndicator:
 
     def update_weather(self):
         weather = pywapi.get_weather_from_yahoo(self.id)
+        print 'Updated @', datetime.datetime.today()
 
-        self.weather = {}
-
-        self.weather[NOW] = {'condition_code': weather[CONDITION]['code'], 'temp': weather[CONDITION]['temp'],
-                             'text': weather[CONDITION]['text']}
+        self.weather = {NOW: {'condition_code': weather[CONDITION]['code'], 'temp': weather[CONDITION]['temp'],
+                              'text': weather[CONDITION]['text']}}
 
         self.weather[NOW]['wind_chill'] = weather['wind']['chill']
         self.weather[NOW]['wind_direction'] = weather['wind']['direction']
@@ -90,7 +147,7 @@ class WeatherIndicator:
 
         self.weather[NOW]['humidity'] = weather[ATMOSPHERE]['humidity']
         self.weather[NOW]['pressure'] = weather[ATMOSPHERE]['pressure']
-        self.weather[NOW]['pressure_rising'] = [False, True][int(weather[ATMOSPHERE]['rising'])]
+        self.weather[NOW]['pressure_rising'] = weather[ATMOSPHERE]['rising']
         self.weather[NOW]['visibility'] = weather[ATMOSPHERE]['visibility']
 
         self.location_name = weather['location']['city'] + ', ' + weather['location']['country']
@@ -108,7 +165,15 @@ class WeatherIndicator:
         return False
 
 
+class Drizzle:
+    def __init__(self):
+        self.config = Config()
+        self.indicator = WeatherIndicator()
+
+
 if __name__ == '__main__':
+    c = Config()
+    c.get_location()
     wi = WeatherIndicator()
     wi.set_location(u'CAXX0295')
     gtk.main()
