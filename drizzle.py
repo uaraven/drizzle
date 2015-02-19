@@ -8,6 +8,7 @@ import gtk
 import appindicator
 
 import pywapi
+import ui
 
 CONFIG_PATH = '.config/drizzle'
 
@@ -85,7 +86,9 @@ class CurrentWeather:
 class WeatherIndicator:
     UNKNOWN_WEATHER = "na"
 
-    def __init__(self):
+    def __init__(self, config):
+
+        self.config = config
 
         self_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "icons")
 
@@ -103,8 +106,10 @@ class WeatherIndicator:
     def update_indicator_menu(self, weather):
         self.menu = gtk.Menu()
 
+        tm = datetime.datetime.now().strftime('%X')
+
         if weather is not None:
-            self.menu.append(self.create_menu_item(weather.location_name))
+            self.menu.append(self.create_menu_item(weather.location_name + ' at ' + tm))
             self.menu.append(self.create_menu_item(None))
             self.menu.append(self.create_menu_item(weather.text))
             self.menu.append(self.create_menu_item(
@@ -118,6 +123,7 @@ class WeatherIndicator:
                 self.menu.append(self.create_menu_item('Visibility: ' + weather.visibility + ' '
                                                        + weather.distance_unit))
             self.menu.append(self.create_menu_item(None))
+        self.menu.append(self.create_configure_menu())
         self.quit_item = gtk.MenuItem("Quit")  # TODO: Localize
         self.quit_item.connect("activate", self.quit)
         self.quit_item.show()
@@ -133,11 +139,21 @@ class WeatherIndicator:
         if weather is not None:
             self.update_indicator_menu(weather)
 
+    def create_configure_menu(self):
+        config = gtk.MenuItem("Configure...")
+        config.connect("activate", self.show_configurator)
+        config.show()
+        return config
+
+    def show_configurator(self, widget):
+        ui.ConfigDialog(self.config)
+
+
 
 class Drizzle:
     def __init__(self):
         self.config = Config()
-        self.indicator = WeatherIndicator()
+        self.indicator = WeatherIndicator(self.config)
         self.weather = None
 
         gtk.timeout_add(self.config.get_update_interval(), self.update_weather)
